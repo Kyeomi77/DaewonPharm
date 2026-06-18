@@ -3,7 +3,7 @@ import asyncio
 from google.cloud import storage
 
 # 설정 변수
-PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT", "test")
+PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT", "test000")
 BUCKET_NAME = "dawwon-pharm-docs-input"  # 입력 문서를 업로드할 버킷 이름
 LOCAL_DOC_DIR = "./sample_docs"          # 로컬 문서가 있는 디렉토리
 
