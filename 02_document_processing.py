@@ -6,7 +6,7 @@ from google.cloud import documentai_v1 as documentai
 
 PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT", "uk-adc-core-geminienterprise")
 LOCATION = "global"  # Vertex AI Search API Location
-OUTPUT_GCS_BUCKET = "dawwon-pharm-docs-output" # 파싱 결과(이미지 등)를 저장할 버킷
+OUTPUT_GCS_BUCKET = "daewonpharm-bucket-2026" # 파싱 결과(이미지 등)를 저장할 버킷
 
 # Custom Extractor 설정 (옵션: 특정 문서에 한해 사용)
 DOCAI_LOCATION = "us"
