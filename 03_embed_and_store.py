@@ -1,3 +1,7 @@
+# 2026-06-19 03_embed_and_store.py 는 02_document_processing.py와 combine 
+# 아래 코드는 02_document_processing.py 파일로 기능이 통합되어 더 이상 사용되지 않습니다.
+# 프로젝트의 문서 처리 및 DB 저장 로직은 02_document_processing.py를 참고하세요.
+"""
 import os
 import asyncio
 import asyncpg
@@ -22,7 +26,7 @@ embedding_model = VertexAIEmbeddings(
 )
 
 async def init_db_pool():
-    """AlloyDB 연결 풀을 초기화합니다."""
+    \"\"\"AlloyDB 연결 풀을 초기화합니다.\"\"\"
     pool = await asyncpg.create_pool(
         host=DB_HOST,
         user=DB_USER,
@@ -37,9 +41,9 @@ async def init_db_pool():
     return pool
 
 async def store_chunks_in_alloydb(pool, document_name: str, chunks: list):
-    """
-    텍스트 청크들을 벡터화하여 AlloyDB(pgvector)에 저장합니다.
-    """
+    
+    # 텍스트 청크들을 벡터화하여 AlloyDB(pgvector)에 저장합니다.
+    
     print(f"[{document_name}] 총 {len(chunks)}개의 청크 임베딩 생성 중...")
     
     # 청크 내용 리스트
@@ -60,10 +64,10 @@ async def store_chunks_in_alloydb(pool, document_name: str, chunks: list):
         ))
     
     # AlloyDB에 Insert
-    query = """
+    query = \"\"\"
     INSERT INTO document_chunks (document_name, page_number, chunk_type, content, embedding)
     VALUES ($1, $2, $3, $4, $5)
-    """
+    \"\"\"
     
     async with pool.acquire() as conn:
         async with conn.transaction():
@@ -89,3 +93,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+"""
