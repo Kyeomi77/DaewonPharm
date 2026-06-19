@@ -10,13 +10,13 @@ OUTPUT_GCS_BUCKET = "daewonpharm-bucket-2026" # 파싱 결과(이미지 등)를 
 
 # Custom Extractor 설정 (옵션: 특정 문서에 한해 사용)
 DOCAI_LOCATION = "us"
-DOCAI_PROCESSOR_ID = "your-custom-extractor-processor-id"
+DOCAI_PROCESSOR_ID = "6373054663fffe8a"
 
 def process_with_vertex_layout_parser(gcs_uri: str, mime_type: str):
-    """
-    Vertex AI Search의 Layout-aware 파싱 API를 사용하여 문서를 구조화된 청크로 분리합니다.
-    (문서의 목차(TOC), 표(Table), 텍스트(Text) 정보를 유지하며 파싱)
-    """
+    
+    # Vertex AI Search의 Layout-aware 파싱 API를 사용하여 문서를 구조화된 청크로 분리합니다.
+    # (문서의 목차(TOC), 표(Table), 텍스트(Text) 정보를 유지하며 파싱)
+    
     # API 클라이언트 초기화
     client_options = {"api_endpoint": f"discoveryengine.googleapis.com"}
     client = discoveryengine.DocumentServiceClient(client_options=client_options)
