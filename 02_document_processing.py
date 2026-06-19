@@ -1,10 +1,12 @@
 import os
 import re
+from typing import List, Dict, Any
 from google.cloud import discoveryengine_v1alpha as discoveryengine
 from google.cloud import documentai_v1 as documentai
 
-PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT", "your-project-id")
-LOCATION = "global" # Vertex AI Search API Location
+PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT", "uk-adc-core-geminienterprise")
+LOCATION = "global"  # Vertex AI Search API Location
+OUTPUT_GCS_BUCKET = "dawwon-pharm-docs-output" # 파싱 결과(이미지 등)를 저장할 버킷
 
 # Custom Extractor 설정 (옵션: 특정 문서에 한해 사용)
 DOCAI_LOCATION = "us"
@@ -15,40 +17,61 @@ def process_with_vertex_layout_parser(gcs_uri: str, mime_type: str):
     Vertex AI Search의 Layout-aware 파싱 API를 사용하여 문서를 구조화된 청크로 분리합니다.
     (문서의 목차(TOC), 표(Table), 텍스트(Text) 정보를 유지하며 파싱)
     """
-    client = discoveryengine.DocumentServiceClient()
-
-    # Document Extraction (Layout-aware)을 위한 요청 생성
-    # 참고: 해당 기능은 alpha 버전 API(v1alpha)에서 지원하는 Layout 추출 기능을 가정합니다.
-    # 사용자의 GCP 환경에 따라 데이터 스토어를 통한 파싱 또는 API 직접 호출을 선택합니다.
-    # 아래는 API를 직접 호출하는 방식의 의사코드(pseudo-code) 패턴입니다.
+    # API 클라이언트 초기화
+    client_options = {"api_endpoint": f"discoveryengine.googleapis.com"}
+    client = discoveryengine.DocumentServiceClient(client_options=client_options)
     
+    # API 요청 구성
+    parent = client.project_path(project=PROJECT_ID)
     request = discoveryengine.ProcessDocumentRequest(
-        parent=f"projects/{PROJECT_ID}/locations/{LOCATION}",
-        gcs_document=discoveryengine.GcsDocument(
+        parent=parent,
+        document=discoveryengine.Document(
             gcs_uri=gcs_uri,
-            mime_type=mime_type
-        )
+            mime_type=mime_type,
+        ),
+        # OCR 및 이미지 추출 활성화
+        process_options=discoveryengine.ProcessOptions(
+            ocr_config=discoveryengine.OcrConfig(
+                enable_native_pdf_parsing=True,
+                enable_image_quality_scores=True,
+            )
+        ),
     )
     
     print(f"Vertex AI Search (Layout-aware)로 문서 파싱 중: {gcs_uri}")
-    # response = client.process_document(request=request)
+    response = client.process_document(request=request)
     
-    # 가상의 반환 데이터 (실제 응답은 Layout 구조를 포함한 JSON 또는 Document 객체)
+    # API 응답을 기반으로 청크 생성
     chunks = []
-    # 예시: 응답으로부터 Layout 구조에 따른 Chunk 추출
-    # for layout_item in response.document.layout:
-    #     if layout_item.type == 'TABLE':
-    #         chunks.append({"type": "table", "content": layout_item.html_content})
-    #     elif layout_item.type == 'TOC':
-    #         chunks.append({"type": "toc", "content": layout_item.text_content})
-    #     else:
-    #         chunks.append({"type": "text", "content": layout_item.text_content})
-            
-    # 더미 반환
-    chunks = [
-        {"type": "text", "content": "임상 시험 목적: 신약 A의 효능 평가."},
-        {"type": "table", "content": "<table><tr><th>부작용</th><th>비율</th></tr><tr><td>두통</td><td>5%</td></tr></table>"}
-    ]
+    doc = response.document
+
+    for page_index, page in enumerate(doc.pages):
+        page_number = page_index + 1
+        
+        # 1. 테이블(Table) 처리
+        for table in page.tables:
+            # 테이블을 HTML 형식으로 변환
+            html_table = "<table>"
+            for row in table.header_rows:
+                html_table += "<tr>" + "".join([f"<th>{cell.layout.text}</th>" for cell in row.cells]) + "</tr>"
+            for row in table.body_rows:
+                html_table += "<tr>" + "".join([f"<td>{cell.layout.text}</td>" for cell in row.cells]) + "</tr>"
+            html_table += "</table>"
+            chunks.append({"type": "table", "page_number": page_number, "content": html_table})
+
+        # 2. 텍스트 블록(Paragraph, List 등) 처리
+        for block in page.blocks:
+            # 테이블에 속하지 않은 텍스트만 추출
+            is_in_table = any(block.layout.text in table_cell.layout.text for table in page.tables for table_row in table.body_rows for table_cell in table_row.cells)
+            if not is_in_table:
+                chunks.append({"type": "text", "page_number": page_number, "content": block.layout.text})
+
+        # 3. 이미지 처리 (화학식, 차트 등 포함)
+        for image in page.images:
+            # 멀티모달 LLM이 직접 참조할 수 있도록 GCS URI를 포함한 마크다운 형식으로 저장
+            image_content = f"![이미지: 페이지 {page_number}]({image.uri})"
+            chunks.append({"type": "image", "page_number": page_number, "content": image_content})
+
     return chunks
 
 def process_with_docai_custom_extractor(gcs_uri: str, mime_type: str):

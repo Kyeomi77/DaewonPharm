@@ -5,7 +5,7 @@ from pgvector.asyncpg import register_vector
 from langchain_google_vertexai import VertexAIEmbeddings
 
 # 설정 변수
-PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT", "your-project-id")
+PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT", "uk-adc-core-geminienterprise")
 LOCATION = "asia-northeast3" # Embeddings API Location
 
 # AlloyDB 연결 정보
