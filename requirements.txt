@@ -1,0 +1,4 @@
+google-adk[extensions]>=2.0.0
+asyncpg>=0.29.0
+pgvector>=0.2.0
+langchain-google-vertexai>=1.0.0
