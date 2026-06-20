@@ -20,10 +20,10 @@ OUTPUT_GCS_BUCKET = "daewonpharm-bucket-out-2026"
 ERROR_GCS_BUCKET = "daewonpharm-bucket-err-2026"
 
 # AlloyDB 연결 정보
-DB_HOST = "127.0.0.1"
+DB_HOST = "34.50.58.39"
 DB_USER = "postgres"
-DB_PASS = "your-password"
-DB_NAME = "pharm_rag"
+DB_PASS = "DawornPharm2026!!"
+DB_NAME = "postgres"
 
 # 임베딩 모델 설정 (1536 차원 고정)
 embedding_model = VertexAIEmbeddings(
