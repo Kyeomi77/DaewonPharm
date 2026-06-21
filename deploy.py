@@ -4,7 +4,7 @@ from vertexai.preview import reasoning_engines
 # GCP 프로젝트 설정
 PROJECT_ID = "uk-adc-core-geminienterprise"
 LOCATION   = "asia-northeast3"
-STAGING_BUCKET = "gs://YOUR_STAGING_BUCKET_NAME"  # 미리 생성한 GCS 버킷
+STAGING_BUCKET = "gs://daewonpharm-bucket-in-2026"  # 미리 생성한 GCS 버킷
 
 vertexai.init(
     project=PROJECT_ID,
