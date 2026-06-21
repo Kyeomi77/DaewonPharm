@@ -1,0 +1,3 @@
+# VS Code 환경
+1.  Gemini -> GLM -> Cluade 
+2.  Gemini : VS Code 에서 환경 오류 셋업 

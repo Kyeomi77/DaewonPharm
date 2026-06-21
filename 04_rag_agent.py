@@ -4,7 +4,7 @@ import asyncio
 from typing import List, Dict, Any
 import asyncpg
 from pgvector.asyncpg import register_vector
-from google.adk import Agent, tool  # Google Agent Platform ADK 라이브러리
+from google.adk import Agent  # Google Agent Platform ADK 라이브러리
 from langchain_google_vertexai import VertexAIEmbeddings
 
 # --- 설정 변수 ---
@@ -22,7 +22,7 @@ embedding_model = VertexAIEmbeddings(
     model_name="text-embedding-004",
     project=PROJECT_ID,
     location=LOCATION,
-    output_dimensionality=1536
+    dimensions=768
 )
 
 # 전역 커넥션 풀 변수 (초기 지연 로딩용)
@@ -44,7 +44,7 @@ async def get_db_pool():
 # ---------------------------------------------------------------------------
 # 1. 커스텀 도구 정의 (Agent Platform이 호출할 핵심 RAG 엔진)
 # ---------------------------------------------------------------------------
-@tool
+#@tool
 async def search_pharma_knowledge_base(user_query: str, user_clearance: int, actor_name: str) -> str:
     """
     대원제약 내부 연구 문서 및 실험 기밀 데이터를 정밀 검색하는 도구입니다. 
@@ -138,7 +138,7 @@ async def search_pharma_knowledge_base(user_query: str, user_clearance: int, act
 # ---------------------------------------------------------------------------
 pharma_agent = Agent(
     name="pharma_rag_compliance_agent",
-    model="gemini-1.5-pro",  # 표 해석 및 인프라 기밀 추론에 특화된 모델 기동
+    model="gemini-2.5-flash",  # 표 해석 및 인프라 기밀 추론에 특화된 모델 기동
     instruction="""
     당신은 대한민국 제약사 연구소의 수석 AI 연구원입니다.
     연구원의 질문이 들어오면 반드시 'search_pharma_knowledge_base' 도구를 사용하여 내부 지식 소스를 조회하십시오.
