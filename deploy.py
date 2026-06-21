@@ -24,6 +24,7 @@ engine = reasoning_engines.ReasoningEngine.create(
         "asyncpg>=0.29.0",
         "pgvector>=0.3.5",
         "langchain-google-vertexai>=2.0.0",
+        "cryptography==41.0.7"
         "google-cloud-secret-manager>=2.16.0",
     ],
     display_name="pharma_rag_compliance_agent",
