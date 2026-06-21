@@ -103,7 +103,7 @@ AlloyDB의 행 수준 보안(RLS)과 하이브리드 검색(RRF)을 결합한 RA
 
 - **GCS 스테이징 버킷 생성:**
   ```bash
-  gsutil mb -l asia-northeast3 gs://YOUR_STAGING_BUCKET
+  gsutil mb -l asia-northeast3 gs://daewonpharm-bucket-run-2026
   ```
 - **Vertex AI API 활성화:**
   ```bash
@@ -122,7 +122,7 @@ from vertexai.preview import reasoning_engines
 # GCP 프로젝트 설정
 PROJECT_ID = "uk-adc-core-geminienterprise"
 LOCATION = "asia-northeast3"
-STAGING_BUCKET = "gs://YOUR_STAGING_BUCKET_NAME"  # 미리 생성한 GCS 버킷
+STAGING_BUCKET = "gs://daewonpharm-bucket-run-2026"  # 미리 생성한 GCS 버킷
 
 vertexai.init(
     project=PROJECT_ID,
@@ -142,6 +142,7 @@ engine = reasoning_engines.ReasoningEngine.create(
         "asyncpg>=0.29.0",
         "pgvector>=0.3.5",
         "langchain-google-vertexai>=2.0.0",
+        "cryptography==41.0.7",
         "google-cloud-secret-manager>=2.16.0",
     ],
     display_name="pharma_rag_compliance_agent",
