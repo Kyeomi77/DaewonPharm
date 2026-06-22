@@ -74,6 +74,13 @@ AlloyDB의 행 수준 보안(RLS)과 하이브리드 검색(RRF)을 결합한 RA
     ```bash
     pip install -r requirements.txt
     ```
+    # DECIMER 버전
+    pip install rdkit
+    pip install pillow
+    pip install requests
+    pip install decimer --no-deps
+    # MolScribe 버전
+    pip install MolScribe --no-deps
 
 ### Step 3: Google Cloud 인증 및 로컬 실행
 

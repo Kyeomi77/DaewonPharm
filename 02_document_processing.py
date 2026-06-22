@@ -1,4 +1,4 @@
-import os
+import io
 import re
 import asyncio
 import mimetypes
@@ -11,6 +11,9 @@ from google.cloud import documentai_v1 as documentai
 import asyncpg
 from pgvector.asyncpg import register_vector
 from langchain_google_vertexai import VertexAIEmbeddings
+import requests
+from PIL import Image
+
 
 # --- 설정 변수 ---
 PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT", "uk-adc-core-geminienterprise")
@@ -34,18 +37,182 @@ embedding_model = VertexAIEmbeddings(
 )
 
 # --- 가상의 화학 구조식 인식(OSR) 모듈 인터페이스 ---
+"""
+화학식 광학 인식 엔진 (OCSR)
+엔진: DECIMER, MolScribe
+
+설치:
+    pip install decimer rdkit pillow requests          # DECIMER 버전
+    pip install MolScribe huggingface_hub torch        # MolScribe 버전
+"""
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 화학식 인식 모듈 : DECIMER 버전
+# ─────────────────────────────────────────────────────────────────────────────
 def analyze_chemical_structure(image_uri: str) -> Dict[str, Any]:
-    """
-    DECIMER / MolScribe 등 화학식 광학 인식 엔진 연동 스텁(Stub)
-    실제 운영 환경에서는 해당 도커 컨테이너 API 또는 라이브러리를 호출합니다.
-    """
-    # 예시 구조 데이터 반환 (실제 모델 연동 필요)
-    return {
-        "smiles": "CC(=O)NC1=CC=C(O)C=C1", # 아세트아미노펜 예시
-        "inchi": "InChI=1S/C8H9NO2/c1-5(10)9-6-2-4-7(11)3-1-6/h1-4,11H,1H3,(H,9,10)",
-        "inchikey": "RZVAJGRAIKMMMZ-UHFFFAOYSA-N",
-        "osr_confidence": 0.98
-    }
+    
+    # 화학식 이미지를 인식하여 SMILES, InChI, InChIKey 반환 (DECIMER 엔진)
+
+    temp_path = "temp_chemical_image.png"
+    try:
+        # ── 1. 이미지 로드 (URL 또는 로컬 파일) ──────────────────────────────
+        if image_uri.startswith(('http://', 'https://')):
+            response = requests.get(image_uri, timeout=10)
+            response.raise_for_status()
+            image = Image.open(io.BytesIO(response.content))
+        else:
+            image = Image.open(image_uri)
+
+        # RGBA / 팔레트 모드 → RGB 변환 (PNG 투명도 등 호환)
+        if image.mode in ('RGBA', 'LA', 'P'):
+            image = image.convert('RGB')
+        image.save(temp_path)
+
+        # ── 2. DECIMER로 SMILES 예측 ─────────────────────────────────────────
+        from DECIMER import predict_SMILES          
+        smiles = predict_SMILES(temp_path)          
+
+        if not smiles:
+            return {
+                "error": "화학식 인식 실패: 이미지에서 화학식을 찾지 못했습니다.",
+                "smiles": "",
+                "inchi": "",
+                "inchikey": "",
+                "osr_confidence": 0.0,
+                "model_used": "DECIMER"
+            }
+
+        # ── 3. RDKit으로 InChI / InChIKey 생성 ───────────────────────────────
+        from rdkit import Chem
+        # [수정 2] rdkit.Chem.inchi 서브모듈에서 직접 import (Chem.MolToInchi 는 존재하지 않음)
+        from rdkit.Chem.inchi import MolToInchi, MolToInchiKey   # ← 수정
+
+        mol = Chem.MolFromSmiles(smiles)
+        if mol:
+            inchi    = MolToInchi(mol)     
+            inchikey = MolToInchiKey(mol)  
+            # [수정 4] SMILES가 유효하면 0.85, 빈 문자열/None이면 0.0 (고정 0.95 제거)
+            osr_confidence = 0.85
+        else:
+            inchi          = ""
+            inchikey       = ""
+            osr_confidence = 0.40   # SMILES는 반환됐지만 rdkit이 파싱 실패 → 낮은 신뢰도
+
+        return {
+            "smiles":         smiles,
+            "inchi":          inchi    or "",
+            "inchikey":       inchikey or "",
+            "osr_confidence": osr_confidence,
+            "model_used":     "DECIMER"
+        }
+
+    except ImportError as e:
+        return {
+            "error": f"의존성 오류: {e}. 'pip install decimer rdkit' 실행 필요.",
+            "smiles": "", "inchi": "", "inchikey": "",
+            "osr_confidence": 0.0, "model_used": "DECIMER"
+        }
+    except Exception as e:
+        return {
+            "error": f"화학식 인식 실패: {e}",
+            "smiles": "", "inchi": "", "inchikey": "",
+            "osr_confidence": 0.0, "model_used": "DECIMER"
+        }
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 화학식 인식 모듈 : MolScribe 버전
+# ─────────────────────────────────────────────────────────────────────────────
+_molscribe_model = None
+
+def analyze_chemical_structure_molscribe(image_uri: str) -> Dict[str, Any]:
+    
+    global _molscribe_model
+    temp_path = "temp_molscribe_image.png"
+
+    try:
+        # ── 1. 모델 로드 (최초 1회) ──────────────────────────────────────────
+        if _molscribe_model is None:
+            import torch
+            from molscribe import MolScribe
+            from huggingface_hub import hf_hub_download
+
+            # [수정 1] 체크포인트를 HuggingFace Hub에서 자동 다운로드
+            ckpt_path = hf_hub_download(
+                repo_id  = "yujieq/MolScribe",
+                filename = "swin_base_char_aux_1m.pth",
+            )
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            # [수정 1] MolScribe(ckpt_path, device) 로 올바르게 초기화
+            _molscribe_model = MolScribe(ckpt_path, device=device)
+
+        model = _molscribe_model
+
+        # ── 2. 이미지 로드 → 임시 파일 저장 ─────────────────────────────────
+        if image_uri.startswith(('http://', 'https://')):
+            response = requests.get(image_uri, timeout=10)
+            response.raise_for_status()
+            image = Image.open(io.BytesIO(response.content))
+        else:
+            image = Image.open(image_uri)
+
+        if image.mode in ('RGBA', 'LA', 'P'):
+            image = image.convert('RGB')
+        image.save(temp_path)
+
+        # ── 3. MolScribe 예측 ─────────────────────────────────────────────────
+        # [수정 2] predict() 대신 predict_image_file() 사용 (올바른 API)
+        output: Dict[str, Any] = model.predict_image_file(
+            temp_path,
+            return_atoms_bonds = True,   # 원자·결합 좌표 반환 (선택)
+            return_confidence  = True,   # 신뢰도 점수 반환
+        )
+
+        smiles     = output.get("smiles", "")
+        confidence = float(output.get("confidence", 0.0))
+
+        if not smiles:
+            return {
+                "error": "MolScribe 인식 실패: SMILES를 추출하지 못했습니다.",
+                "smiles": "", "inchi": "", "inchikey": "",
+                "osr_confidence": 0.0, "model_used": "MolScribe"
+            }
+
+        # ── 4. rdkit 으로 InChI / InChIKey 변환 ──────────────────────────────
+        from rdkit import Chem
+        from rdkit.Chem.inchi import MolToInchi, MolToInchiKey
+
+        mol      = Chem.MolFromSmiles(smiles)
+        inchi    = MolToInchi(mol)    if mol else ""
+        inchikey = MolToInchiKey(mol) if mol else ""
+
+        return {
+            "smiles":         smiles,
+            "inchi":          inchi    or "",
+            "inchikey":       inchikey or "",
+            "osr_confidence": confidence,
+            "molfile":        output.get("molfile", ""),   # 구조 좌표 포함 MOL 형식
+            "model_used":     "MolScribe"
+        }
+
+    except ImportError as e:
+        return {
+            "error": f"의존성 오류: {e}. 'pip install MolScribe huggingface_hub torch' 실행 필요.",
+            "smiles": "", "inchi": "", "inchikey": "",
+            "osr_confidence": 0.0, "model_used": "MolScribe"
+        }
+    except Exception as e:
+        return {
+            "error": f"MolScribe 오류: {e}",
+            "smiles": "", "inchi": "", "inchikey": "",
+            "osr_confidence": 0.0, "model_used": "MolScribe"
+        }
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
 
 # --- 데이터베이스 함수 ---
 
