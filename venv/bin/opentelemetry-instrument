@@ -1,6 +1,7 @@
-#!/Users/uclick/Downloads/TKCO/DaewonPharm/DaewonPharm/venv/bin/python3.11
+#!/Users/jameskim/Downloads/TKCO/DaewonPharm/venv/bin/python3.13
 import sys
 from opentelemetry.instrumentation.auto_instrumentation import run
 if __name__ == '__main__':
-    sys.argv[0] = sys.argv[0].removesuffix('.exe')
+    if sys.argv[0].endswith('.exe'):
+        sys.argv[0] = sys.argv[0][:-4]
     sys.exit(run())
